@@ -10,32 +10,32 @@ static int isBMPFormat(PT_FileMap ptFileMap);
 static int GetPixelDatasFrmBMP(PT_FileMap ptFileMap, PT_PixelDatas ptPixelDatas);
 static int FreePixelDatasForBMP(PT_PixelDatas ptPixelDatas);
 
-#pragma pack(push) /* ����ǰpack����ѹջ���� */
-#pragma pack(1)    /* �����ڽṹ�嶨��֮ǰʹ��,����Ϊ���ýṹ���и���Ա��1�ֽڶ��� */
+#pragma pack(push) /* 将当前pack设置压栈保存 */
+#pragma pack(1)    /* 必须在结构体定义之前使用,这是为了让结构体中各成员按1字节对齐 */
 
 typedef struct tagBITMAPFILEHEADER { /* bmfh */
-	unsigned short bfType; 
-	unsigned long  bfSize;
-	unsigned short bfReserved1;
-	unsigned short bfReserved2;
-	unsigned long  bfOffBits;
+	unsigned short bfType; //文件类型
+	unsigned long  bfSize;  //文件的大小，用字节表示
+	unsigned short bfReserved1; //保留位
+	unsigned short bfReserved2; //保留位
+	unsigned long  bfOffBits;   //文件开头到实际的图像数据之间的偏移量
 } BITMAPFILEHEADER;
 
 typedef struct tagBITMAPINFOHEADER { /* bmih */
-	unsigned long  biSize;
-	unsigned long  biWidth;
-	unsigned long  biHeight;
-	unsigned short biPlanes;
-	unsigned short biBitCount;
-	unsigned long  biCompression;
-	unsigned long  biSizeImage;
-	unsigned long  biXPelsPerMeter;
-	unsigned long  biYPelsPerMeter;
-	unsigned long  biClrUsed;
-	unsigned long  biClrImportant;
+	unsigned long  biSize;  //BITMAPINFOHEADER结构体需要的字节数
+	unsigned long  biWidth; //图像宽度，以像素为单位
+	unsigned long  biHeight;    //图像高度，以像素为单位，正数--图像是倒向的，负数--图像是正向的
+	unsigned short biPlanes;    //目标设备说明位面数，其值总是置为1
+	unsigned short biBitCount;  //一个像素的位数
+	unsigned long  biCompression;   //图像数据压缩的类型，我们只讨论BI_RGB格式
+	unsigned long  biSizeImage; //图像的大小，以字节为单位，当使用BI_RGB格式时，可置为0
+	unsigned long  biXPelsPerMeter; //水平分辨率，用像素/米来表示
+	unsigned long  biYPelsPerMeter; //垂直分辨率，用像素/米来表示
+	unsigned long  biClrUsed;   //位图实际使用的彩色表示中的颜色索引数（设为0的话，则说明所有调色板项）
+	unsigned long  biClrImportant;  //对像素显示有重要影响的颜色索引的数目，0表示都重要
 } BITMAPINFOHEADER;
 
-#pragma pack(pop) /* �ָ���ǰ��pack���� */
+#pragma pack(pop) /* 恢复先前的pack设置 */
 
 static T_PicFileParser g_tBMPParser = {
 	.name           = "bmp",
@@ -45,14 +45,14 @@ static T_PicFileParser g_tBMPParser = {
 };
 
 /**********************************************************************
- * �������ƣ� isBMPFormat
- * ���������� BMPģ���Ƿ�֧�ָ��ļ�,�����ļ��Ƿ�ΪBMP�ļ�
- * ��������� ptFileMap - �ں��ļ���Ϣ
- * ��������� ��
- * �� �� ֵ�� 0 - ��֧��, 1 - ֧��
- * �޸�����        �汾��     �޸���	      �޸�����
+ * 函数名称： isBMPFormat
+ * 功能描述： BMP模块是否支持该文件,即该文件是否为BMP文件
+ * 输入参数： ptFileMap - 内含文件信息
+ * 输出参数： 无
+ * 返 回 值： 0 - 不支持, 1 - 支持
+ * 修改日期        版本号     修改人	      修改内容
  * -----------------------------------------------
- * 2021/05/08	     V1.0	  �ŵ���	      ����
+ * 2021/05/08	     V1.0	  张登雨	      创建
  ***********************************************************************/
 static int isBMPFormat(PT_FileMap ptFileMap)
 {
@@ -66,18 +66,18 @@ static int isBMPFormat(PT_FileMap ptFileMap)
 }
 
 /**********************************************************************
- * �������ƣ� CovertOneLine
- * ���������� ��BMP�ļ���һ�е���������,ת��Ϊ������ʾ�豸��ʹ�õĸ�ʽ
- * ��������� iWidth      - ����,�����ٸ�����
- *            iSrcBpp     - BMP�ļ���һ�������ö���λ����ʾ
- *            iDstBpp     - ��ʾ�豸��һ�������ö���λ����ʾ
- *            pudSrcDatas - BMP�ļ���������ݵ�λ��
- *            pudDstDatas - ת���������ݴ洢��λ��
- * ��������� ��
- * �� �� ֵ�� 0 - �ɹ�, ����ֵ - ʧ��
- * �޸�����        �汾��     �޸���	      �޸�����
+ * 函数名称： CovertOneLine
+ * 功能描述： 把BMP文件中一行的象素数据,转换为能在显示设备上使用的格式
+ * 输入参数： iWidth      - 宽度,即多少个象素
+ *            iSrcBpp     - BMP文件中一个象素用多少位来表示
+ *            iDstBpp     - 显示设备上一个象素用多少位来表示
+ *            pudSrcDatas - BMP文件里该行数据的位置
+ *            pudDstDatas - 转换所得数据存储的位置
+ * 输出参数： 无
+ * 返 回 值： 0 - 成功, 其他值 - 失败
+ * 修改日期        版本号     修改人	      修改内容
  * -----------------------------------------------
- * 2021/05/08	     V1.0	  �ŵ���	      ����
+ * 2021/05/08	     V1.0	  张登雨	      创建
  ***********************************************************************/
 static int CovertOneLine(int iWidth, int iSrcBpp, int iDstBpp, unsigned char *pudSrcDatas, unsigned char *pudDstDatas)
 {
@@ -122,15 +122,15 @@ static int CovertOneLine(int iWidth, int iSrcBpp, int iDstBpp, unsigned char *pu
 }
 
 /**********************************************************************
- * �������ƣ� GetPixelDatasFrmBMP
- * ���������� ��BMP�ļ��е���������,ȡ����ת��Ϊ������ʾ�豸��ʹ�õĸ�ʽ
- * ��������� ptFileMap    - �ں��ļ���Ϣ
- * ��������� ptPixelDatas - �ں���������
- *            ptPixelDatas->iBpp ������Ĳ���, ��ȷ����BMP�ļ��õ�������Ҫת��Ϊ��BPP
- * �� �� ֵ�� 0 - �ɹ�, ����ֵ - ʧ��
- * �޸�����        �汾��     �޸���          �޸�����
+ * 函数名称： GetPixelDatasFrmBMP
+ * 功能描述： 把BMP文件中的象素数据,取出并转换为能在显示设备上使用的格式
+ * 输入参数： ptFileMap    - 内含文件信息
+ * 输出参数： ptPixelDatas - 内含象素数据
+ *            ptPixelDatas->iBpp 是输入的参数, 它确定从BMP文件得到的数据要转换为该BPP
+ * 返 回 值： 0 - 成功, 其他值 - 失败
+ * 修改日期        版本号     修改人          修改内容
  * -----------------------------------------------
- * 2013/02/08        V1.0     Τ��ɽ          ����
+ * 2013/02/08        V1.0     韦东山          创建
  ***********************************************************************/
 static int GetPixelDatasFrmBMP(PT_FileMap ptFileMap, PT_PixelDatas ptPixelDatas)
 {
@@ -175,7 +175,7 @@ static int GetPixelDatasFrmBMP(PT_FileMap ptFileMap, PT_PixelDatas ptPixelDatas)
 	}
 
 	iLineWidthReal = iWidth * iBMPBpp / 8;
-	iLineWidthAlign = (iLineWidthReal + 3) & ~0x3;   /* ��4ȡ�� */
+	iLineWidthAlign = (iLineWidthReal + 3) & ~0x3;   /* 向4取整 */
 		
 	pucSrc = aFileHead + ptBITMAPFILEHEADER->bfOffBits;
 	pucSrc = pucSrc + (iHeight - 1) * iLineWidthAlign;
@@ -192,14 +192,14 @@ static int GetPixelDatasFrmBMP(PT_FileMap ptFileMap, PT_PixelDatas ptPixelDatas)
 }
 
 /**********************************************************************
- * �������ƣ� FreePixelDatasForBMP
- * ���������� GetPixelDatasFrmBMP�ķ�����,������������ռ�ڴ��ͷŵ�
- * ��������� ptPixelDatas - �ں���������
- * ��������� ��
- * �� �� ֵ�� 0 - �ɹ�, ����ֵ - ʧ��
- * �޸�����        �汾��     �޸���          �޸�����
+ * 函数名称： FreePixelDatasForBMP
+ * 功能描述： GetPixelDatasFrmBMP的反函数,把象素数据所占内存释放掉
+ * 输入参数： ptPixelDatas - 内含象素数据
+ * 输出参数： 无
+ * 返 回 值： 0 - 成功, 其他值 - 失败
+ * 修改日期        版本号     修改人          修改内容
  * -----------------------------------------------
- * 2013/02/08        V1.0     Τ��ɽ          ����
+ * 2013/02/08        V1.0     韦东山          创建
  ***********************************************************************/
 static int FreePixelDatasForBMP(PT_PixelDatas ptPixelDatas)
 {
@@ -208,14 +208,14 @@ static int FreePixelDatasForBMP(PT_PixelDatas ptPixelDatas)
 }
 
 /**********************************************************************
- * �������ƣ� BMPParserInit
- * ���������� ע��"BMP�ļ�����ģ��"
- * ��������� ��
- * ��������� ��
- * �� �� ֵ�� 0 - �ɹ�, ����ֵ - ʧ��
- * �޸�����        �汾��     �޸���	      �޸�����
+ * 函数名称： BMPParserInit
+ * 功能描述： 注册"BMP文件解析模块"
+ * 输入参数： 无
+ * 输出参数： 无
+ * 返 回 值： 0 - 成功, 其他值 - 失败
+ * 修改日期        版本号     修改人	      修改内容
  * -----------------------------------------------
- * 2021/05/08	     V1.0	  �ŵ���	      ����
+ * 2021/05/08	     V1.0	  张登雨	      创建
  ***********************************************************************/
 int BMPParserInit(void)
 {
